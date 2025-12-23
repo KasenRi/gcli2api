@@ -253,6 +253,35 @@ def convert_tools(anthropic_tools: Optional[List[Dict[str, Any]]]) -> Optional[L
     return gemini_tools or None
 
 
+def _is_search_tool_name(name: str) -> bool:
+    return "search" in str(name or "").lower()
+
+
+def filter_tools_for_antigravity(
+    anthropic_tools: Optional[List[Dict[str, Any]]]
+) -> Optional[List[Dict[str, Any]]]:
+    if not anthropic_tools:
+        return None
+
+    if len(anthropic_tools) <= 1:
+        return anthropic_tools
+
+    search_tools = [
+        tool for tool in anthropic_tools
+        if isinstance(tool, dict) and _is_search_tool_name(tool.get("name", ""))
+    ]
+
+    if len(search_tools) == len(anthropic_tools):
+        return anthropic_tools
+
+    if search_tools:
+        log.info("[ANTHROPIC] Filtering tools to search-only for antigravity compatibility")
+        return search_tools
+
+    log.info("[ANTHROPIC] Dropping tools for antigravity compatibility")
+    return None
+
+
 def _extract_tool_result_output(content: Any) -> str:
     """
     从 tool_result.content 中提取输出字符串（按 converter.py 的最小语义）。
@@ -269,7 +298,11 @@ def _extract_tool_result_output(content: Any) -> str:
     return str(content)
 
 
-def convert_messages_to_contents(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def convert_messages_to_contents(
+    messages: List[Dict[str, Any]],
+    *,
+    allow_thinking: bool = True,
+) -> List[Dict[str, Any]]:
     """
     将 Anthropic messages[] 转换为下游 contents[]（role: user/model, parts: []）。
     """
@@ -293,6 +326,8 @@ def convert_messages_to_contents(messages: List[Dict[str, Any]]) -> List[Dict[st
 
                 item_type = item.get("type")
                 if item_type == "thinking":
+                    if not allow_thinking:
+                        continue
                     # Anthropic 的历史 thinking block 在回放时通常要求携带 signature；
                     # 若缺失 signature，下游可能会报 “thinking.signature: Field required”。
                     # 为保证兼容性，这里选择丢弃无 signature 的 thinking block。
@@ -310,6 +345,8 @@ def convert_messages_to_contents(messages: List[Dict[str, Any]]) -> List[Dict[st
                     }
                     parts.append(part)
                 elif item_type == "redacted_thinking":
+                    if not allow_thinking:
+                        continue
                     signature = item.get("signature")
                     if not signature:
                         continue
@@ -589,10 +626,21 @@ def convert_anthropic_request_to_antigravity_components(payload: Dict[str, Any])
     if not isinstance(messages, list):
         messages = []
 
-    contents = convert_messages_to_contents(messages)
+    thinking_value = payload.get("thinking", None) if "thinking" in payload else None
+    allow_thinking = False
+    if thinking_value is None:
+        allow_thinking = False
+    elif isinstance(thinking_value, bool):
+        allow_thinking = thinking_value
+    elif isinstance(thinking_value, dict):
+        allow_thinking = thinking_value.get("type", "enabled") == "enabled"
+    else:
+        allow_thinking = True
+
+    contents = convert_messages_to_contents(messages, allow_thinking=allow_thinking)
     contents = reorganize_tool_messages(contents)
     system_instruction = build_system_instruction(payload.get("system"))
-    tools = convert_tools(payload.get("tools"))
+    tools = convert_tools(filter_tools_for_antigravity(payload.get("tools")))
     generation_config = build_generation_config(payload)
 
     return {
