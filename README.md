@@ -1,3 +1,14 @@
+# 本分支解决的问题
+- 让CLI的模型也支持Claude的调用格式
+- 为了让Claude Code能正常使用这个项目的api，为Claude Code的Web Search做了兼容
+  - 让Claude Code需要Web Search的时候，路由到CLI，调用CLI中的search模型
+  - 让CLI中的search模型输出符合Claude Code需要的规范
+
+# 如果你想在Claude Code里调用GCLI2API项目中的其他模型
+- 正常启动："claude"
+- 其他模型启动："claude --model gemini-3-pro-high"（后面的模型名可以自己改）
+
+——————
 # GeminiCLI to API
 
 **将 GeminiCLI 和 antigravity 转换为 OpenAI 和 GEMINI API 接口**
