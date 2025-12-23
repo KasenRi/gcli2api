@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -42,8 +42,8 @@ _SENSITIVE_KEYS = {
 
 def _remove_nulls_for_tool_input(value: Any) -> Any:
     """
-    閫掑綊绉婚櫎 dict/list 涓€间负 null/None 鐨勫瓧娈?鍏冪礌銆?
-    鑳屾櫙锛歊oo/Kilo 鍦?Anthropic native tool 璺緞涓嬶紝鑻ユ敹鍒?tool_use.input 涓寘鍚?null锛?    鍙兘浼氭妸 null 褰撲綔鐪熷疄鍏ュ弬鎵ц锛堜緥濡傗€滃湪 null 涓悳绱⑩€濓級銆傚洜姝ゅ湪杩斿洖 tool_use.input 鍓嶅仛鍏滃簳娓呯悊銆?    """
+    Recursively remove null/None entries from dict/list values.
+    This avoids null tool inputs in Anthropic tool_use."""
     if isinstance(value, dict):
         cleaned: Dict[str, Any] = {}
         for k, v in value.items():
@@ -65,7 +65,7 @@ def _remove_nulls_for_tool_input(value: Any) -> Any:
 
 def _anthropic_debug_max_chars() -> int:
     """
-    璋冭瘯鏃ュ織涓崟涓瓧绗︿覆瀛楁鐨勬渶澶ц緭鍑洪暱搴︼紙閬垮厤鎶?base64 鍥剧墖/瓒呴暱 schema 鎵撶垎鏃ュ織锛夈€?    """
+    Max output length for debug log fields (avoid huge base64/schema)."""
     raw = str(os.getenv("ANTHROPIC_DEBUG_MAX_CHARS", "")).strip()
     if not raw:
         return 2000
@@ -81,17 +81,17 @@ def _anthropic_debug_enabled() -> bool:
 
 def _anthropic_debug_body_enabled() -> bool:
     """
-    鏄惁鎵撳嵃璇锋眰浣?涓嬫父璇锋眰浣撶瓑鈥滈珮浣撶Н鈥濊皟璇曟棩蹇椼€?
-    璇存槑锛歚ANTHROPIC_DEBUG=1` 浠呭紑鍚?token 瀵规瘮绛夌簿绠€鏃ュ織锛涗负閬垮厤鍒峰睆锛屽叆鍙?涓嬫父 body 蹇呴』鏄惧紡寮€鍚€?    """
+    Whether to log request bodies and other large debug payloads.
+    Note: set ANTHROPIC_DEBUG_BODY=1 to enable body logging."""
     return str(os.getenv("ANTHROPIC_DEBUG_BODY", "")).strip().lower() in _DEBUG_TRUE
 
 
 def _redact_for_log(value: Any, *, key_hint: str | None = None, max_chars: int) -> Any:
     """
-    閫掑綊鑴辨晱/鎴柇鐢ㄤ簬鏃ュ織鎵撳嵃鐨?JSON銆?
-    鐩爣锛?    - 璁╃敤鎴疯兘鐪嬪埌鈥滃疄闄呭叆鍙傜粨鏋勨€濓紙system/messages/tools 绛夛級
-    - 榛樿閬垮厤娉勯湶鍑瘉/浠ょ墝
-    - 閬垮厤鎶婂浘鐗?base64 鎴栬秴闀垮瓧娈电洿鎺ュ啓鍏ユ棩蹇楁枃浠?    """
+    Recursively redact or truncate JSON values for logging.
+    Goals:
+    - Keep request structure visible (system/messages/tools).
+    - Avoid leaking secrets or huge base64 blobs."""
     if isinstance(value, dict):
         redacted: Dict[str, Any] = {}
         for k, v in value.items():
@@ -112,7 +112,7 @@ def _redact_for_log(value: Any, *, key_hint: str | None = None, max_chars: int) 
         if len(value) > max_chars:
             head = value[: max_chars // 2]
             tail = value[-max_chars // 2 :]
-            return f"{head}<...鐪佺暐 {len(value) - len(head) - len(tail)} 瀛楃...>{tail}"
+            return f"{head}<...omitted {len(value) - len(head) - len(tail)} chars...>{tail}"
         return value
 
     return value
@@ -127,7 +127,7 @@ def _json_dumps_for_log(data: Any) -> str:
 
 def _debug_log_request_payload(request: Request, payload: Dict[str, Any]) -> None:
     """
-    鍦ㄥ紑鍚?`ANTHROPIC_DEBUG` 鏃舵墦鍗板叆鍙傦紙宸茶劚鏁?鎴柇锛夈€?    """
+    Log inbound request payloads when debug is enabled (redacted/truncated)."""
     if not _anthropic_debug_enabled() or not _anthropic_debug_body_enabled():
         return
 
@@ -147,7 +147,7 @@ def _debug_log_request_payload(request: Request, payload: Dict[str, Any]) -> Non
 
 def _debug_log_downstream_request_body(request_body: Dict[str, Any]) -> None:
     """
-    鍦ㄥ紑鍚?`ANTHROPIC_DEBUG` 鏃舵墦鍗版渶缁堣浆鍙戝埌涓嬫父鐨勮姹備綋锛堝凡鎴柇锛夈€?    """
+    Log downstream request body when debug is enabled (redacted/truncated)."""
     if not _anthropic_debug_enabled() or not _anthropic_debug_body_enabled():
         return
 
@@ -172,7 +172,7 @@ def _extract_api_token(
     request: Request, credentials: Optional[HTTPAuthorizationCredentials]
 ) -> Optional[str]:
     """
-    Anthropic 鐢熸€佸鎴风閫氬父浣跨敤 `x-api-key`锛涚幇鏈夐」鐩叾瀹冭矾鐢变娇鐢?`Authorization: Bearer`銆?    杩欓噷鍚屾椂鍏煎涓ょ鏂瑰紡锛屼究浜庘€滄棤鎰熸帴鍏モ€濄€?    """
+    Anthropic clients use x-api-key or Authorization: Bearer; accept both."""
     if credentials and credentials.credentials:
         return credentials.credentials
 
@@ -345,11 +345,11 @@ def _is_search_requested(payload: Dict[str, Any]) -> bool:
 
 def _pick_usage_metadata_from_antigravity_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    鍏煎涓嬫父 usageMetadata 鐨勫绉嶈惤鐐癸細
+    Prefer usageMetadata from response or candidate if present.
+    Sources:
     - response.usageMetadata
     - response.candidates[0].usageMetadata
-
-    濡備袱鑰呭悓鏃跺瓨鍦紝浼樺厛閫夋嫨鈥滃瓧娈垫洿瀹屾暣鈥濈殑涓€渚с€?    """
+    Prefer the side with more fields."""
     response = response_data.get("response", {}) or {}
     if not isinstance(response, dict):
         return {}
@@ -591,18 +591,18 @@ async def anthropic_messages(
     password = await get_api_password()
     token = _extract_api_token(request, credentials)
     if token != password:
-        return _anthropic_error(status_code=403, message="瀵嗙爜閿欒", error_type="authentication_error")
+        return _anthropic_error(status_code=403, message="invalid api key", error_type="authentication_error")
 
     try:
         payload = await request.json()
     except Exception as e:
         return _anthropic_error(
-            status_code=400, message=f"JSON 瑙ｆ瀽澶辫触: {str(e)}", error_type="invalid_request_error"
+            status_code=400, message=f"JSON parse failed: {str(e)}", error_type="invalid_request_error"
         )
 
     if not isinstance(payload, dict):
         return _anthropic_error(
-            status_code=400, message="璇锋眰浣撳繀椤讳负 JSON object", error_type="invalid_request_error"
+            status_code=400, message="request body must be a JSON object", error_type="invalid_request_error"
         )
 
     _debug_log_request_payload(request, payload)
@@ -626,7 +626,7 @@ async def anthropic_messages(
     if not model or max_tokens is None or not isinstance(messages, list):
         return _anthropic_error(
             status_code=400,
-            message="缂哄皯蹇呭～瀛楁锛歮odel / max_tokens / messages",
+            message="missing required fields: model / max_tokens / messages",
             error_type="invalid_request_error",
         )
 
@@ -639,7 +639,7 @@ async def anthropic_messages(
 
     user_agent = request.headers.get("user-agent", "")
     log.info(
-        f"[ANTHROPIC] /messages 鏀跺埌璇锋眰: client={client_host}:{client_port}, model={model}, "
+        f"[ANTHROPIC] /messages received: client={client_host}:{client_port}, model={model}, "
         f"stream={stream}, messages={len(messages)}, thinking_present={thinking_present}, "
         f"thinking={thinking_summary}, ua={user_agent}"
     )
@@ -671,7 +671,7 @@ async def anthropic_messages(
                 status_code=400, message="request conversion failed", error_type="invalid_request_error"
             )
 
-        components["model"] = "gemini-3-flash-preview"
+        components["model"] = "gemini-3-flash-preview-search"
         components["tools"] = [{"googleSearch": {}}]
         components["system_instruction"] = _append_system_instruction(
             components.get("system_instruction"),
@@ -679,7 +679,7 @@ async def anthropic_messages(
             "No markdown, no extra text.",
         )
         log.info(
-            f"[ANTHROPIC] search mode: route to /v1/chat/completions (model={components['model']})"
+            f"[ANTHROPIC] search mode: route to /gapi/v1/chat/completions (model={components['model']})"
         )
 
         if not (components.get("contents") or []):
@@ -693,7 +693,7 @@ async def anthropic_messages(
         try:
             estimated_tokens = estimate_input_tokens(payload)
         except Exception as e:
-            log.debug(f"[ANTHROPIC] token 盲录掳莽庐鈥斆ヂぢ泵绰? {e}")
+            log.debug(f"[ANTHROPIC] token estimate failed: {e}")
 
         request_data: Dict[str, Any] = {
             "contents": components["contents"],
@@ -848,7 +848,7 @@ async def anthropic_messages(
     cred_mgr = await get_credential_manager()
     cred_result = await cred_mgr.get_valid_credential(is_antigravity=True)
     if not cred_result:
-        return _anthropic_error(status_code=500, message="褰撳墠鏃犲彲鐢?antigravity 鍑瘉")
+        return _anthropic_error(status_code=500, message="no valid antigravity credential")
 
     _, credential_data = cred_result
     project_id, session_id = _infer_project_and_session(credential_data)
@@ -856,26 +856,26 @@ async def anthropic_messages(
     try:
         components = convert_anthropic_request_to_antigravity_components(payload)
     except Exception as e:
-        log.error(f"[ANTHROPIC] 璇锋眰杞崲澶辫触: {e}")
+        log.error(f"[ANTHROPIC] request conversion failed: {e}")
         return _anthropic_error(
-            status_code=400, message="璇锋眰杞崲澶辫触", error_type="invalid_request_error"
+            status_code=400, message="request conversion failed", error_type="invalid_request_error"
         )
 
-    log.info(f"[ANTHROPIC] /messages 妯″瀷鏄犲皠: upstream={model} -> downstream={components['model']}")
+    log.info(f"[ANTHROPIC] /messages model mapping: upstream={model} -> downstream={components['model']}")
 
-    # 涓嬫父瑕佹眰姣忔潯 text 鍐呭鍧楀繀椤诲寘鍚€滈潪绌虹櫧鈥濇枃鏈紱涓婃父瀹㈡埛绔伓灏斾細杩藉姞绌虹櫧 text block锛堜緥濡傚浘鐗囧悗璺熶竴涓┖瀛楃涓诧級锛?    # 缁忚繃杞崲杩囨护鍚庡彲鑳藉鑷?contents 涓虹┖锛屾鏃跺簲鍦ㄦ湰鍦扮洿鎺ヨ繑鍥?400锛岄伩鍏嶆妸鏃犳晥璇锋眰鎵撳埌涓嬫父銆?    if not (components.get("contents") or []):
+    # Downstream requires each text block to be non-empty; ensure contents is not empty.
         return _anthropic_error(
             status_code=400,
-            message="messages 涓嶈兘涓虹┖锛泃ext 鍐呭鍧楀繀椤诲寘鍚潪绌虹櫧鏂囨湰",
+            message="messages cannot be empty; text blocks must be non-empty",
             error_type="invalid_request_error",
         )
 
-    # 绠€鍗曚及绠?token
+    # Rough token estimate
     estimated_tokens = 0
     try:
         estimated_tokens = estimate_input_tokens(payload)
     except Exception as e:
-        log.debug(f"[ANTHROPIC] token 浼扮畻澶辫触: {e}")
+        log.debug(f"[ANTHROPIC] token estimate failed: {e}")
 
     request_body = build_antigravity_request_body(
         contents=components["contents"],
@@ -895,12 +895,12 @@ async def anthropic_messages(
             resources, cred_name, _ = await send_antigravity_request_stream(request_body, cred_mgr)
             response, stream_ctx, client = resources
         except Exception as e:
-            log.error(f"[ANTHROPIC] 涓嬫父娴佸紡璇锋眰澶辫触: {e}")
-            return _anthropic_error(status_code=500, message="涓嬫父璇锋眰澶辫触", error_type="api_error")
+            log.error(f"[ANTHROPIC] upstream stream request failed: {e}")
+            return _anthropic_error(status_code=500, message="upstream request failed", error_type="api_error")
 
         async def stream_generator():
             try:
-                # response 鐜板湪鏄?filtered_lines 鐢熸垚鍣紝鐩存帴浣跨敤
+                # response is a filtered_lines generator; iterate directly
                 async for chunk in antigravity_sse_to_anthropic_sse(
                     response,
                     model=str(model),
@@ -914,11 +914,11 @@ async def anthropic_messages(
                 try:
                     await stream_ctx.__aexit__(None, None, None)
                 except Exception as e:
-                    log.debug(f"[ANTHROPIC] 鍏抽棴 stream_ctx 澶辫触: {e}")
+                    log.debug(f"[ANTHROPIC] failed to close stream_ctx: {e}")
                 try:
                     await client.aclose()
                 except Exception as e:
-                    log.debug(f"[ANTHROPIC] 鍏抽棴 client 澶辫触: {e}")
+                    log.debug(f"[ANTHROPIC] failed to close client: {e}")
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
@@ -926,8 +926,8 @@ async def anthropic_messages(
     try:
         response_data, _, _ = await send_antigravity_request_no_stream(request_body, cred_mgr)
     except Exception as e:
-        log.error(f"[ANTHROPIC] 涓嬫父闈炴祦寮忚姹傚け璐? {e}")
-        return _anthropic_error(status_code=500, message="涓嬫父璇锋眰澶辫触", error_type="api_error")
+        log.error(f"[ANTHROPIC] upstream non-stream request failed: {e}")
+        return _anthropic_error(status_code=500, message="upstream request failed", error_type="api_error")
 
     anthropic_response = _convert_antigravity_response_to_anthropic_message(
         response_data,
@@ -944,25 +944,25 @@ async def anthropic_messages_count_tokens(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ):
     """
-    Anthropic Messages API 鍏煎鐨?token 璁℃暟绔偣锛堢敤浜?claude-cli 绛夊鎴风棰勬锛夈€?
-    杩斿洖缁撴瀯灏介噺璐磋繎 Anthropic锛歚{"input_tokens": <int>}`銆?    """
+    Compatibility token count endpoint for Anthropic Messages API (for clients like claude-cli).
+    Returns {"input_tokens": <int>}."""
     from config import get_api_password
 
     password = await get_api_password()
     token = _extract_api_token(request, credentials)
     if token != password:
-        return _anthropic_error(status_code=403, message="瀵嗙爜閿欒", error_type="authentication_error")
+        return _anthropic_error(status_code=403, message="invalid api key", error_type="authentication_error")
 
     try:
         payload = await request.json()
     except Exception as e:
         return _anthropic_error(
-            status_code=400, message=f"JSON 瑙ｆ瀽澶辫触: {str(e)}", error_type="invalid_request_error"
+            status_code=400, message=f"JSON parse failed: {str(e)}", error_type="invalid_request_error"
         )
 
     if not isinstance(payload, dict):
         return _anthropic_error(
-            status_code=400, message="璇锋眰浣撳繀椤讳负 JSON object", error_type="invalid_request_error"
+            status_code=400, message="request body must be a JSON object", error_type="invalid_request_error"
         )
 
     _debug_log_request_payload(request, payload)
@@ -970,7 +970,7 @@ async def anthropic_messages_count_tokens(
     if not payload.get("model") or not isinstance(payload.get("messages"), list):
         return _anthropic_error(
             status_code=400,
-            message="缂哄皯蹇呭～瀛楁锛歮odel / messages",
+            message="missing required fields: model / messages",
             error_type="invalid_request_error",
         )
 
@@ -995,15 +995,15 @@ async def anthropic_messages_count_tokens(
 
     user_agent = request.headers.get("user-agent", "")
     log.info(
-        f"[ANTHROPIC] /messages/count_tokens 鏀跺埌璇锋眰: client={client_host}:{client_port}, "
+        f"[ANTHROPIC] /messages/count_tokens received: client={client_host}:{client_port}, "
         f"model={payload.get('model')}, messages={len(payload.get('messages') or [])}, "
         f"thinking_present={thinking_present}, thinking={thinking_summary}, ua={user_agent}"
     )
 
-    # 绠€鍗曚及绠?    input_tokens = 0
+    # Rough token estimate
     try:
         input_tokens = estimate_input_tokens(payload)
     except Exception as e:
-        log.error(f"[ANTHROPIC] token 浼扮畻澶辫触: {e}")
+        log.error(f"[ANTHROPIC] token estimate failed: {e}")
 
     return JSONResponse(content={"input_tokens": input_tokens})
