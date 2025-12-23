@@ -270,10 +270,12 @@ def filter_tools_for_antigravity(
     if len(anthropic_tools) <= 1:
         return anthropic_tools
 
-    search_tools = [
-        tool for tool in anthropic_tools
-        if isinstance(tool, dict) and _is_search_tool_name(tool.get("name", ""))
-    ]
+    search_tools = []
+    for tool in anthropic_tools:
+        if not isinstance(tool, dict):
+            continue
+        if _is_search_tool_name(tool.get("name", "")) or _is_search_tool_name(tool.get("type", "")):
+            search_tools.append(tool)
 
     if len(search_tools) == len(anthropic_tools):
         return anthropic_tools
@@ -712,7 +714,21 @@ def convert_anthropic_request_to_antigravity_components(payload: Dict[str, Any])
     contents = convert_messages_to_contents(messages, allow_thinking=allow_thinking)
     contents = reorganize_tool_messages(contents)
     system_instruction = build_system_instruction(payload.get("system"))
-    tools = convert_tools(filter_tools_for_antigravity(payload.get("tools")))
+    raw_tools = payload.get("tools")
+    search_requested = False
+    if isinstance(raw_tools, list):
+        for tool in raw_tools:
+            if not isinstance(tool, dict):
+                continue
+            if _is_search_tool_name(tool.get("name", "")) or _is_search_tool_name(tool.get("type", "")):
+                search_requested = True
+                break
+
+    if search_requested:
+        model = "gemini-3-flash-preview-search"
+        tools = [{"googleSearch": {}}]
+    else:
+        tools = convert_tools(filter_tools_for_antigravity(raw_tools))
 
     return {
         "model": model,

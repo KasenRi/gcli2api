@@ -215,7 +215,9 @@ def _has_search_tool(payload: Dict[str, Any]) -> bool:
     if not isinstance(tools, list):
         return False
     for tool in tools:
-        if isinstance(tool, dict) and _is_search_tool_name(tool.get("name", "")):
+        if not isinstance(tool, dict):
+            continue
+        if _is_search_tool_name(tool.get("name", "")) or _is_search_tool_name(tool.get("type", "")):
             return True
     return False
 
@@ -546,6 +548,8 @@ async def anthropic_messages(
                 status_code=400, message="è¯·æ±‚è½¬æ¢å¤±è´¥", error_type="invalid_request_error"
             )
 
+        components["model"] = "gemini-3-flash-preview-search"
+        components["tools"] = [{"googleSearch": {}}]
         log.info(
             f"[ANTHROPIC] search æ¨¡å¼ï¼Œè½¬å‘åˆ° /v1/chat/completions ï¼ˆmodel={components['model']}ï¼‰"
         )
