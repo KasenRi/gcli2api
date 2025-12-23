@@ -214,6 +214,34 @@ def _sse_event(event: str, data: Dict[str, Any]) -> bytes:
 def _is_search_tool_name(name: str) -> bool:
     return "search" in str(name or "").lower()
 
+def _payload_mentions_web_search(payload: Dict[str, Any]) -> bool:
+    def _texts_from_blocks(blocks: Any) -> list[str]:
+        texts: list[str] = []
+        if isinstance(blocks, list):
+            for block in blocks:
+                if isinstance(block, str):
+                    texts.append(block)
+                elif isinstance(block, dict) and "text" in block:
+                    texts.append(str(block.get("text") or ""))
+        elif isinstance(blocks, str):
+            texts.append(blocks)
+        return texts
+
+    messages = payload.get("messages") or []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        for text in _texts_from_blocks(msg.get("content")):
+            if "web search" in text.lower():
+                return True
+
+    system_blocks = payload.get("system") or []
+    for text in _texts_from_blocks(system_blocks):
+        if "web search" in text.lower():
+            return True
+
+    return False
+
 
 def _is_search_requested(payload: Dict[str, Any]) -> bool:
     tools = payload.get("tools")
@@ -243,7 +271,7 @@ def _is_search_requested(payload: Dict[str, Any]) -> bool:
             return True
         return False
 
-    return False
+    return _payload_mentions_web_search(payload)
 
 def _pick_usage_metadata_from_antigravity_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
     """
