@@ -831,6 +831,7 @@ async def anthropic_messages(
                     "content_block_stop",
                     {"type": "content_block_stop", "index": idx},
                 )
+            yield _sse_event(
                 "message_delta",
                 {
                     "type": "message_delta",
