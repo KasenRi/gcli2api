@@ -651,7 +651,9 @@ async def anthropic_messages(
                 "type": "message",
                 "role": "assistant",
                 "model": str(model),
-                "content": [{"type": "text", "text": "antigravity Anthropic Messages 姝ｅ父宸ヤ綔涓?}],
+                "content": [
+                    {"type": "text", "text": "antigravity Anthropic Messages OK"}
+                ],
                 "stop_reason": "end_turn",
                 "stop_sequence": None,
                 "usage": {"input_tokens": 0, "output_tokens": 0},
@@ -664,9 +666,9 @@ async def anthropic_messages(
         try:
             components = convert_anthropic_request_to_antigravity_components(payload)
         except Exception as e:
-            log.error(f"[ANTHROPIC] 猫炉路忙卤鈥毭铰β嵚⒚ヂぢ泵绰? {e}")
+            log.error(f"[ANTHROPIC] request conversion failed: {e}")
             return _anthropic_error(
-                status_code=400, message="猫炉路忙卤鈥毭铰β嵚⒚ヂぢ泵绰?, error_type="invalid_request_error"
+                status_code=400, message="request conversion failed", error_type="invalid_request_error"
             )
 
         components["model"] = "gemini-3-flash-preview"
@@ -683,7 +685,7 @@ async def anthropic_messages(
         if not (components.get("contents") or []):
             return _anthropic_error(
                 status_code=400,
-                message="messages 盲赂聧猫茠陆盲赂潞莽漏潞茂录鈥簍ext 氓鈥犫€γヂ姑ヂ濃€斆ヂ库€γ┞÷幻ヅ掆€γヂ惵┞澟久┞好р劉陆忙鈥撯€∶ε撀?,
+                message="messages cannot be empty; text blocks must be non-empty",
                 error_type="invalid_request_error",
             )
 
@@ -709,7 +711,7 @@ async def anthropic_messages(
         if getattr(response, "status_code", 200) != 200:
             return _anthropic_error(
                 status_code=getattr(response, "status_code", 500),
-                message="盲赂鈥姑β嘎该访β扁€毭ヂぢ泵绰?,
+                message="upstream request failed",
                 error_type="api_error",
             )
 
@@ -724,8 +726,8 @@ async def anthropic_messages(
                     response.content.decode() if isinstance(response.content, bytes) else response.content
                 )
         except Exception as e:
-            log.error(f"[ANTHROPIC] 氓鈥溌嵜ヂ衡€澝铰β嵚⒚ヂぢ泵绰? {e}")
-            return _anthropic_error(status_code=500, message="氓鈥溌嵜ヂ衡€澝铰β嵚⒚ヂぢ泵绰?, error_type="api_error")
+            log.error(f"[ANTHROPIC] failed to parse upstream response: {e}")
+            return _anthropic_error(status_code=500, message="failed to parse upstream response", error_type="api_error")
 
         raw_text = _extract_text_from_gemini_response(response_data)
         parsed = _parse_search_json(raw_text)
