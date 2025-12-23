@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -354,6 +355,26 @@ def _payload_mentions_web_search(payload: Dict[str, Any]) -> bool:
             return True
 
     return False
+
+
+def _normalize_search_query(query: str) -> str:
+    text = str(query or "").strip()
+    if not text:
+        return ""
+    match = re.search(
+        r"web\s*search\s*\(\s*['\"](.+?)['\"]\s*\)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).strip()
+    for marker in ("query:", "查询:", "查询："):
+        idx = text.lower().find(marker)
+        if idx != -1:
+            candidate = text[idx + len(marker):].strip()
+            if candidate:
+                return candidate
+    return text
 
 
 def _anthropic_content_to_text(content: Any) -> str:
@@ -833,6 +854,10 @@ async def anthropic_messages(
             query = str(_infer_search_query(payload) or "")
         if not results and grounding_results:
             results = grounding_results
+
+        query = _normalize_search_query(query)
+        if not query:
+            query = "web search"
 
         tool_name = _extract_search_tool_name(payload)
         tool_use_id = f"toolu_{uuid.uuid4().hex}"
